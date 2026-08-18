@@ -49,8 +49,8 @@ export class BookingService {
         where: { id: targetCruise.id }
       });
 
-      if (!cruise || cruise.capacityLeft < pricing.total_passengers) {
-        throw new Error('Booking failed: Cruise has insufficient capacity remaining.');
+      if (!cruise || cruise.capacityLeft < 1) {
+        throw new Error('Booking failed: Cruise has no remaining cabins available.');
       }
 
       // B. Upsert Customer Record
@@ -86,10 +86,10 @@ export class BookingService {
         });
       }
 
-      // D. Decrement Cruise Capacity Atomically
+      // D. Decrement Cruise Capacity Atomically (1 Cabin Occupied per Booking)
       await tx.cruise.update({
         where: { id: cruise.id },
-        data: { capacityLeft: { decrement: pricing.total_passengers } }
+        data: { capacityLeft: { decrement: 1 } }
       });
 
       // E. Create Main Booking Header Snapshot Record

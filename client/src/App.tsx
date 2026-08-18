@@ -77,7 +77,6 @@ export const App: React.FC = () => {
             <span className="promo-chip" title="10% off min spend $1,000">SUMMER10 (-10%)</span>
             <span className="promo-chip" title="$150 off min spend $2,000">FIRST150 (-$150)</span>
             <span className="promo-chip" title="25% off max 3 uses">CREW25 (-25%)</span>
-            <span className="promo-chip" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Expired code">WINTER5 (Expired)</span>
           </div>
         </section>
 

@@ -1,6 +1,8 @@
 export interface PassengerInput {
   type: 'adult' | 'child';
   age: number;
+  first_name?: string;
+  last_name?: string;
 }
 
 export interface Cruise {
