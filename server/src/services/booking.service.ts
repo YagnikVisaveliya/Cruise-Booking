@@ -50,7 +50,7 @@ export class BookingService {
       });
 
       if (!cruise || cruise.capacityLeft < 1) {
-        throw new Error('Booking failed: Cruise has no remaining cabins available.');
+        throw new Error('Booking failed: Cruise has insufficient capacity remaining (0 cabins available).');
       }
 
       // B. Upsert Customer Record
