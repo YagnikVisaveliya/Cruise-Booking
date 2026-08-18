@@ -29,9 +29,16 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
   const [bookingLoading, setBookingLoading] = useState<boolean>(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
 
+  const capacityLeft = typeof cruise.capacity_left === 'number' ? cruise.capacity_left : 0;
+  const maxAllowedPassengers = Math.min(6, capacityLeft);
+  const totalPassengers = adultCount + childrenAges.length;
+  const isMaxReached = totalPassengers >= maxAllowedPassengers;
+  const isSoldOut = capacityLeft === 0;
+
   // Recalculate price when passengers, services, or promo code changes
   useEffect(() => {
     const fetchPrice = async () => {
+      if (totalPassengers === 0 || isSoldOut) return;
       const passengers: PassengerInput[] = [
         ...Array(adultCount).fill({ type: 'adult', age: 30 }),
         ...childrenAges.map(age => ({ type: 'child' as const, age }))
@@ -56,10 +63,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
     };
 
     fetchPrice();
-  }, [cruise.id, adultCount, childrenAges, selectedServices, promoCodeInput, customerInfo.email]);
+  }, [cruise.id, adultCount, childrenAges, selectedServices, promoCodeInput, customerInfo.email, isSoldOut, totalPassengers]);
 
   const handleAddChild = () => {
-    if (adultCount + childrenAges.length >= 6) return;
+    if (adultCount + childrenAges.length >= maxAllowedPassengers) return;
     setChildrenAges([...childrenAges, 8]); // default 8 y/o
   };
 
@@ -134,6 +141,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
         {/* STEP 1: PASSENGERS */}
         {step === 1 && (
           <div>
+            {/* Sold Out Warning Banner */}
+            {isSoldOut ? (
+              <div style={{ background: '#ffe4e6', border: '1px solid #fecdd3', color: '#be123c', padding: '0.9rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
+                <AlertCircle size={20} />
+                <span>No more cabins are available on this cruise voyage.</span>
+              </div>
+            ) : isMaxReached ? (
+              <div style={{ background: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '0.9rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
+                <AlertCircle size={20} />
+                <span>Maximum available cabin capacity reached ({capacityLeft} cabin{capacityLeft > 1 ? 's' : ''} left). No more cabins available for additional passengers.</span>
+              </div>
+            ) : null}
+
             <div className="form-group glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -143,14 +163,16 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <button
                     className="btn btn-secondary"
-                    disabled={adultCount <= 1}
+                    disabled={adultCount <= 1 || isSoldOut}
                     onClick={() => setAdultCount(adultCount - 1)}
                   >-</button>
                   <span style={{ fontSize: '1.2rem', fontWeight: 800, minWidth: '30px', textAlign: 'center' }}>{adultCount}</span>
                   <button
                     className="btn btn-secondary"
-                    disabled={adultCount + childrenAges.length >= 6}
-                    onClick={() => setAdultCount(adultCount + 1)}
+                    disabled={isMaxReached || isSoldOut}
+                    onClick={() => {
+                      if (!isMaxReached && !isSoldOut) setAdultCount(adultCount + 1);
+                    }}
                   >+</button>
                 </div>
               </div>
@@ -162,12 +184,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                 <div>
                   <h4 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Child Passengers (Age 0 to 17)</h4>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    0-4 yrs: <strong style={{ color: '#34d399' }}>Free (100% off)</strong> | 5-11 yrs: <strong style={{ color: '#fbbf24' }}>50% off</strong> | 12-17 yrs: <strong style={{ color: '#60a5fa' }}>25% off</strong>
+                    0-4 yrs: <strong style={{ color: '#10b981' }}>Free (100% off)</strong> | 5-11 yrs: <strong style={{ color: '#ff9900' }}>50% off</strong> | 12-17 yrs: <strong style={{ color: '#0052cc' }}>25% off</strong>
                   </p>
                 </div>
                 <button
                   className="btn btn-secondary"
-                  disabled={adultCount + childrenAges.length >= 6}
+                  disabled={isMaxReached || isSoldOut}
                   onClick={handleAddChild}
                 >
                   + Add Child
@@ -175,7 +197,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               </div>
 
               {childrenAges.map((age, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '10px' }}>
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
                   <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Child #{idx + 1} Age:</span>
                   <input
                     type="number"
@@ -186,7 +208,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                     className="form-input"
                     style={{ width: '90px' }}
                   />
-                  <span style={{ fontSize: '0.85rem', color: age <= 4 ? '#34d399' : age <= 11 ? '#fbbf24' : '#60a5fa', fontWeight: 700 }}>
+                  <span style={{ fontSize: '0.85rem', color: age <= 4 ? '#10b981' : age <= 11 ? '#d97706' : '#0052cc', fontWeight: 700 }}>
                     {age <= 4 ? 'Free (100% Off)' : age <= 11 ? '50% Off Adult Fare' : '25% Off (Pays 75%)'}
                   </span>
                   <button
@@ -200,8 +222,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Total Passengers: {adultCount + childrenAges.length} / 6 (Max)</span>
-              <button className="btn btn-primary" onClick={() => setStep(2)}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>
+                Total Passengers: {totalPassengers} / {maxAllowedPassengers} ({isSoldOut ? 'No cabins available' : `${capacityLeft} cabin${capacityLeft !== 1 ? 's' : ''} left`})
+              </span>
+              <button
+                className="btn btn-primary"
+                disabled={isSoldOut || totalPassengers === 0 || totalPassengers > capacityLeft}
+                onClick={() => setStep(2)}
+              >
                 <span>Next: Optional Services</span>
                 <ArrowRight size={18} />
               </button>
@@ -220,7 +248,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               >
                 <input type="checkbox" checked={selectedServices.includes('insurance')} onChange={() => {}} style={{ width: '20px', height: '20px' }} />
                 <div>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>🛡️ Travel Insurance</h4>
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-navy)' }}>🛡️ Travel Insurance</h4>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Full trip cancellation protection • $80 per passenger</p>
                 </div>
               </div>
@@ -232,7 +260,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               >
                 <input type="checkbox" checked={selectedServices.includes('wifi')} onChange={() => {}} style={{ width: '20px', height: '20px' }} />
                 <div>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>📶 High-Speed Wi-Fi Package</h4>
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-navy)' }}>📶 High-Speed Wi-Fi Package</h4>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Unlimited streaming satellite internet • $15 per passenger per night</p>
                 </div>
               </div>
@@ -244,7 +272,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               >
                 <input type="checkbox" checked={selectedServices.includes('excursion')} onChange={() => {}} style={{ width: '20px', height: '20px' }} />
                 <div>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>🏝️ VIP Shore Excursion Pass</h4>
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-navy)' }}>🏝️ VIP Shore Excursion Pass</h4>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Guided island tours & water activities • $120 per passenger</p>
                 </div>
               </div>
@@ -267,7 +295,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
         {step === 3 && (
           <div>
             {pricingError && (
-              <div style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid var(--accent-rose)', color: '#fb7185', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <AlertCircle size={20} />
                 <span>{pricingError}</span>
               </div>
@@ -299,11 +327,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               {pricing?.promo && promoCodeInput && (
                 <div style={{ marginTop: '0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>
                   {pricing.promo.valid ? (
-                    <span style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <CheckCircle2 size={16} /> Code '{pricing.promo.code}' applied: -$${pricing.promo.discount_amount.toFixed(2)} off!
+                    <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <CheckCircle2 size={16} /> Code '{pricing.promo.code}' applied: -${pricing.promo.discount_amount.toFixed(2)} off!
                     </span>
                   ) : (
-                    <span style={{ color: '#fb7185', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: '#be123c', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <AlertCircle size={16} /> {pricing.promo.rejection_reason}
                     </span>
                   )}
@@ -314,7 +342,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
             {/* Live Transparent Price Table */}
             {pricing && (
               <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>Transparent Price Breakdown</h4>
+                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--accent-navy)' }}>Transparent Price Breakdown</h4>
                 <table className="price-table">
                   <tbody>
                     {pricing.passengers_breakdown.map((p, idx) => (
@@ -323,7 +351,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                         <td style={{ textAlign: 'right' }}>
                           ${p.base_fare.toFixed(2)}
                           {p.child_discount_percentage > 0 && (
-                            <span style={{ color: '#34d399', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                            <span style={{ color: '#10b981', fontSize: '0.8rem', marginLeft: '0.5rem', fontWeight: 700 }}>
                               (-{p.child_discount_percentage}%)
                             </span>
                           )}
@@ -332,7 +360,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                       </tr>
                     ))}
 
-                    <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    <tr style={{ background: '#f8fafc' }}>
                       <td colSpan={2}>
                         Gross Cruise Subtotal
                       </td>
@@ -340,7 +368,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                     </tr>
 
                     {pricing.group_discount_amount > 0 && (
-                      <tr style={{ color: '#34d399' }}>
+                      <tr style={{ color: '#10b981' }}>
                         <td colSpan={2}>
                           Group Discount ({pricing.group_discount_tier.percentage}% for {pricing.total_passengers} pax)
                         </td>
@@ -356,7 +384,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                     ))}
 
                     {pricing.promo.valid && (
-                      <tr style={{ color: '#34d399' }}>
+                      <tr style={{ color: '#10b981' }}>
                         <td colSpan={2}>Promo Code ({pricing.promo.code})</td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>-${pricing.promo.discount_amount.toFixed(2)}</td>
                       </tr>
@@ -378,7 +406,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
 
             {/* Customer Info Form */}
             <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-              <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>Contact Information</h4>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--accent-navy)' }}>Contact Information</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label className="form-label">First Name</label>
@@ -427,7 +455,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
             </div>
 
             {bookingError && (
-              <div style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid var(--accent-rose)', color: '#fb7185', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
                 {bookingError}
               </div>
             )}
@@ -451,12 +479,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
         {/* STEP 4: CONFIRMATION RECEIPT */}
         {step === 4 && bookingConfirmed && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-            <div style={{ display: 'inline-flex', padding: '1rem', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '50%', color: '#34d399', marginBottom: '1rem' }}>
+            <div style={{ display: 'inline-flex', padding: '1rem', background: '#dcfce7', borderRadius: '50%', color: '#16a34a', marginBottom: '1rem' }}>
               <CheckCircle2 size={48} />
             </div>
 
-            <h3 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Booking Reference: <span style={{ color: 'var(--accent-cyan)', fontFamily: 'monospace' }}>{bookingConfirmed.booking_reference}</span>
+            <h3 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--accent-navy)' }}>
+              Booking Reference: <span style={{ color: 'var(--accent-blue)', fontFamily: 'monospace' }}>{bookingConfirmed.booking_reference}</span>
             </h3>
 
             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
@@ -464,13 +492,13 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
             </p>
 
             <div className="glass-panel" style={{ textAlign: 'left', padding: '1.5rem', marginBottom: '2rem' }}>
-              <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem', color: 'var(--accent-navy)' }}>
                 Immutable Snapshot Summary
               </h4>
               <p><strong>Customer:</strong> {bookingConfirmed.customer.first_name} {bookingConfirmed.customer.last_name} ({bookingConfirmed.customer.email})</p>
               <p><strong>Destination:</strong> {bookingConfirmed.cruise.destination} ({bookingConfirmed.cruise.nights} Nights)</p>
               <p><strong>Total Passengers:</strong> {bookingConfirmed.breakdown.total_passengers} ({bookingConfirmed.breakdown.adult_count} Adults, {bookingConfirmed.breakdown.child_count} Children)</p>
-              <p><strong>Amount Charged:</strong> <span style={{ color: 'var(--accent-cyan)', fontWeight: 800 }}>${bookingConfirmed.breakdown.total_amount_charged.toFixed(2)}</span></p>
+              <p><strong>Amount Charged:</strong> <span style={{ color: 'var(--accent-blue)', fontWeight: 800 }}>${bookingConfirmed.breakdown.total_amount_charged.toFixed(2)}</span></p>
             </div>
 
             <button className="btn btn-primary" onClick={onClose}>
