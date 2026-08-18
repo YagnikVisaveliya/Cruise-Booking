@@ -170,7 +170,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
         customer: customerInfo,
         passengers: apiPassengers,
         selected_services: selectedServices,
-        promo_code: promoCodeInput.trim() || undefined
+        promo_code: (pricing?.promo?.valid && promoCodeInput.trim()) ? promoCodeInput.trim() : undefined
       });
       setBookingConfirmed(res);
       setStep(4);

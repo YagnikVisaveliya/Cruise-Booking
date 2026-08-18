@@ -42,36 +42,37 @@ export class PricingService {
 
     let promoObj: PurePromoCode | null = null;
     let customerRedemptions = 0;
+    let promoRejectionReason: string | undefined = undefined;
 
     if (promo_code) {
       const p = await prisma.promotionalCode.findUnique({
-        where: { code: promo_code.toUpperCase() }
+        where: { code: promo_code.trim().toUpperCase() }
       });
 
       if (!p) {
-        throw new Error(`Promotional code '${promo_code}' does not exist.`);
-      }
+        promoRejectionReason = `Promotional code '${promo_code}' does not exist.`;
+      } else {
+        promoObj = {
+          code: p.code,
+          discountType: p.discountType as 'percentage' | 'fixed',
+          discountValue: p.discountValue,
+          validFrom: p.validFrom.toISOString().split('T')[0],
+          validTo: p.validTo.toISOString().split('T')[0],
+          maxTotalUses: p.maxTotalUses,
+          maxUsesPerCustomer: p.maxUsesPerCustomer,
+          minSpendCents: p.minSpendCents,
+          currentUses: p.currentUses
+        };
 
-      promoObj = {
-        code: p.code,
-        discountType: p.discountType as 'percentage' | 'fixed',
-        discountValue: p.discountValue,
-        validFrom: p.validFrom.toISOString().split('T')[0],
-        validTo: p.validTo.toISOString().split('T')[0],
-        maxTotalUses: p.maxTotalUses,
-        maxUsesPerCustomer: p.maxUsesPerCustomer,
-        minSpendCents: p.minSpendCents,
-        currentUses: p.currentUses
-      };
-
-      if (customer_email) {
-        const cust = await prisma.customer.findUnique({
-          where: { email: customer_email.toLowerCase() }
-        });
-        if (cust) {
-          customerRedemptions = await prisma.promoRedemption.count({
-            where: { promoCodeId: p.id, customerId: cust.id }
+        if (customer_email) {
+          const cust = await prisma.customer.findUnique({
+            where: { email: customer_email.toLowerCase() }
           });
+          if (cust) {
+            customerRedemptions = await prisma.promoRedemption.count({
+              where: { promoCodeId: p.id, customerId: cust.id }
+            });
+          }
         }
       }
     }
@@ -81,14 +82,31 @@ export class PricingService {
       age: p.age
     }));
 
-    const result = PricingEngine.calculateQuote({
-      adultBaseFareCents: cruise.adultFareCents,
-      nights: cruise.nights,
-      passengers: purePassengers,
-      selectedServiceIds: selected_services,
-      promoCodeObj: promoObj,
-      customerRedemptionsCount: customerRedemptions
-    });
+    let result;
+    try {
+      result = PricingEngine.calculateQuote({
+        adultBaseFareCents: cruise.adultFareCents,
+        nights: cruise.nights,
+        passengers: purePassengers,
+        selectedServiceIds: selected_services,
+        promoCodeObj: promoObj,
+        customerRedemptionsCount: customerRedemptions
+      });
+    } catch (err: any) {
+      if (promoObj) {
+        promoRejectionReason = err.message;
+        result = PricingEngine.calculateQuote({
+          adultBaseFareCents: cruise.adultFareCents,
+          nights: cruise.nights,
+          passengers: purePassengers,
+          selectedServiceIds: selected_services,
+          promoCodeObj: null,
+          customerRedemptionsCount: 0
+        });
+      } else {
+        throw err;
+      }
+    }
 
     return {
       cruise: {
@@ -132,9 +150,10 @@ export class PricingService {
       optional_services_total: result.servicesSubtotalCents / 100,
       subtotal_before_promo: result.subtotalBeforePromoCents / 100,
       promo: {
-        valid: true,
-        code: result.promoCodeApplied,
-        discount_amount: result.promoDiscountAmountCents / 100
+        valid: Boolean(result.promoCodeApplied && !promoRejectionReason),
+        code: result.promoCodeApplied || (promo_code ? promo_code.trim().toUpperCase() : undefined),
+        discount_amount: result.promoDiscountAmountCents / 100,
+        rejection_reason: promoRejectionReason
       },
       taxable_subtotal: result.taxableSubtotalCents / 100,
       net_payable_before_tax: result.taxableSubtotalCents / 100,
