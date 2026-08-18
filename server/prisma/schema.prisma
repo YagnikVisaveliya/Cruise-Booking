@@ -1,0 +1,177 @@
+// Prisma Schema for Odysseus Cruise Booking System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Dynamic Configuration Models
+model PricingRule {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("pricing_rules")
+}
+
+model ChildAgeBand {
+  id                 String   @id @default(uuid())
+  minAge             Int      @map("min_age")
+  maxAge             Int      @map("max_age")
+  discountPercentage Float    @map("discount_percentage")
+  description        String?
+
+  @@map("child_age_bands")
+}
+
+model GroupDiscountTier {
+  id                 String @id @default(uuid())
+  minPassengers      Int    @map("min_passengers")
+  maxPassengers      Int    @map("max_passengers")
+  discountPercentage Float  @map("discount_percentage")
+
+  @@map("group_discount_tiers")
+}
+
+model OptionalService {
+  id             String @id
+  name           String
+  unitPriceCents Int    @map("unit_price_cents")
+  pricingUnit    String @map("pricing_unit")
+
+  @@map("optional_services")
+}
+
+// 2. Cruise Inventory Model
+model Cruise {
+  id             String    @id @default(uuid())
+  cruiseLine     String    @map("cruise_line")
+  shipName       String    @map("ship_name")
+  destination    String
+  nights         Int
+  adultFareCents Int       @map("adult_fare_cents")
+  capacityTotal  Int       @map("capacity_total")
+  capacityLeft   Int       @map("capacity_left")
+  imageUrl       String?   @map("image_url")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  bookings       Booking[]
+
+  @@map("cruises")
+}
+
+// 3. Promotional Code Model
+model PromotionalCode {
+  id                 String            @id @default(uuid())
+  code               String            @unique
+  discountType       String            @map("discount_type")
+  discountValue      Float             @map("discount_value")
+  validFrom          DateTime          @map("valid_from")
+  validTo            DateTime          @map("valid_to")
+  maxTotalUses       Int               @map("max_total_uses")
+  maxUsesPerCustomer Int               @map("max_uses_per_customer")
+  minSpendCents      Int               @default(0) @map("min_spend_cents")
+  currentUses        Int               @default(0) @map("current_uses")
+  bookings           Booking[]
+  redemptions        PromoRedemption[]
+
+  @@map("promotional_codes")
+}
+
+// 4. Customer Model
+model Customer {
+  id          String            @id @default(uuid())
+  firstName   String            @map("first_name")
+  lastName    String            @map("last_name")
+  email       String            @unique
+  phone       String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  bookings    Booking[]
+  redemptions PromoRedemption[]
+
+  @@map("customers")
+}
+
+// 5. Booking Header Model (Snapshot & Immutability)
+model Booking {
+  id                              String             @id @default(uuid())
+  bookingReference                String             @unique @map("booking_reference")
+  customerId                      String             @map("customer_id")
+  cruiseId                        String             @map("cruise_id")
+  nightsSnapshot                  Int                @map("nights_snapshot")
+  adultFareCentsSnapshot          Int                @map("adult_fare_cents_snapshot")
+  totalPassengers                 Int                @map("total_passengers")
+  adultCount                      Int                @map("adult_count")
+  childCount                      Int                @map("child_count")
+  grossCruiseFareCents            Int                @map("gross_cruise_fare_cents")
+  groupDiscountPercentageSnapshot Float              @default(0.0) @map("group_discount_percentage_snapshot")
+  groupDiscountAmountCents        Int                @default(0) @map("group_discount_amount_cents")
+  netCruiseFareCents              Int                @map("net_cruise_fare_cents")
+  optionalServicesTotalCents      Int                @default(0) @map("optional_services_total_cents")
+  subtotalBeforePromoCents        Int                @map("subtotal_before_promo_cents")
+  promoCodeId                     String?            @map("promo_code_id")
+  promoCodeNameSnapshot           String?            @map("promo_code_name_snapshot")
+  promoDiscountAmountCents        Int                @default(0) @map("promo_discount_amount_cents")
+  netPayableBeforeTaxCents        Int                @map("net_payable_before_tax_cents")
+  taxRatePercentageSnapshot       Float              @map("tax_rate_percentage_snapshot")
+  taxAmountCents                  Int                @map("tax_amount_cents")
+  totalAmountChargedCents         Int                @map("total_amount_charged_cents")
+  status                          String             @default("CONFIRMED")
+  createdAt                       DateTime           @default(now()) @map("created_at")
+  
+  customer                        Customer           @relation(fields: [customerId], references: [id])
+  cruise                          Cruise             @relation(fields: [cruiseId], references: [id])
+  promotionalCode                 PromotionalCode?   @relation(fields: [promoCodeId], references: [id])
+  passengers                      BookingPassenger[]
+  services                        BookingService[]
+  redemptions                     PromoRedemption[]
+
+  @@map("bookings")
+}
+
+// 6. Booking Passenger Line Item Snapshot Model
+model BookingPassenger {
+  id                              String   @id @default(uuid())
+  bookingId                       String   @map("booking_id")
+  passengerType                   String   @map("passenger_type")
+  age                             Int
+  baseFareCentsSnapshot           Int      @map("base_fare_cents_snapshot")
+  childDiscountPercentageSnapshot Float    @default(0.0) @map("child_discount_percentage_snapshot")
+  chargedFareCents                Int      @map("charged_fare_cents")
+
+  booking                         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_passengers")
+}
+
+// 7. Booking Service Line Item Snapshot Model
+model BookingService {
+  id                     String   @id @default(uuid())
+  bookingId              String   @map("booking_id")
+  serviceId              String   @map("service_id")
+  serviceNameSnapshot    String   @map("service_name_snapshot")
+  unitPriceCentsSnapshot Int      @map("unit_price_cents_snapshot")
+  quantity               Int
+  totalChargedCents      Int      @map("total_charged_cents")
+
+  booking                Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_services")
+}
+
+// 8. Promo Redemption Audit Trail Model
+model PromoRedemption {
+  id            String          @id @default(uuid())
+  promoCodeId   String          @map("promo_code_id")
+  customerId    String          @map("customer_id")
+  bookingId     String          @map("booking_id")
+  redeemedAt    DateTime        @default(now()) @map("redeemed_at")
+
+  promotionalCode PromotionalCode @relation(fields: [promoCodeId], references: [id])
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  booking         Booking         @relation(fields: [bookingId], references: [id])
+
+  @@map("promo_redemptions")
+}
