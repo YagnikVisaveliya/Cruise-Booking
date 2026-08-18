@@ -4,7 +4,7 @@ export interface PassengerInput {
 }
 
 export interface Cruise {
-  id: number;
+  id: string | number;
   cruise_line: string;
   ship_name: string;
   destination: string;
@@ -51,7 +51,7 @@ export interface PromoCode {
 }
 
 export interface PriceCalculationRequest {
-  cruise_id: number;
+  cruise_id: string | number;
   passengers: PassengerInput[];
   selected_services?: string[];
   promo_code?: string;
@@ -87,7 +87,7 @@ export interface PromoValidationResult {
 
 export interface PriceCalculationResponse {
   cruise: {
-    id: number;
+    id: string | number;
     cruise_line: string;
     ship_name: string;
     destination: string;
@@ -117,7 +117,7 @@ export interface PriceCalculationResponse {
 }
 
 export interface CreateBookingRequest {
-  cruise_id: number;
+  cruise_id: string | number;
   customer: {
     first_name: string;
     last_name: string;

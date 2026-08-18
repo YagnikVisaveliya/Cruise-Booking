@@ -43,7 +43,7 @@ export class BookingService {
     const bookingRef = this.generateReference();
 
     // 2. Execute Transaction using Prisma Client
-    return await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       // A. Fetch & Lock Cruise for Capacity Check
       const cruise = await tx.cruise.findUnique({
         where: { id: targetCruise.id }
@@ -158,9 +158,9 @@ export class BookingService {
           }
         });
       }
-
-      return this.getBookingByReference(bookingRef);
     });
+
+    return await this.getBookingByReference(bookingRef);
   }
 
   /**
