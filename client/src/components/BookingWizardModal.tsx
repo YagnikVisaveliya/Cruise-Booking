@@ -24,6 +24,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
     { id: 'pax_1', type: 'adult', age: 30, first_name: '', last_name: '' }
   ]);
 
+  const [passengerValidationError, setPassengerValidationError] = useState<string | null>(null);
+
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [promoCodeInput, setPromoCodeInput] = useState<string>('');
   const [customerInfo, setCustomerInfo] = useState({
@@ -92,6 +94,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
 
   const handleAddAdult = () => {
     if (totalPassengers >= 6) return;
+    setPassengerValidationError(null);
     setPassengersList([
       ...passengersList,
       { id: `pax_${Date.now()}_${Math.random()}`, type: 'adult', age: 30, first_name: '', last_name: '' }
@@ -100,6 +103,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
 
   const handleAddChild = () => {
     if (totalPassengers >= 6) return;
+    setPassengerValidationError(null);
     setPassengersList([
       ...passengersList,
       { id: `pax_${Date.now()}_${Math.random()}`, type: 'child', age: 8, first_name: '', last_name: '' }
@@ -111,16 +115,30 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
     const remaining = passengersList.filter(p => p.id !== id);
     const adultRemaining = remaining.some(p => p.type === 'adult');
     if (!adultRemaining) return;
+    setPassengerValidationError(null);
     setPassengersList(remaining);
   };
 
   const handlePassengerChange = (id: string, field: keyof DetailedPassenger, value: any) => {
+    setPassengerValidationError(null);
     setPassengersList(passengersList.map(p => {
       if (p.id === id) {
         return { ...p, [field]: value };
       }
       return p;
     }));
+  };
+
+  const handleNextFromStep1 = () => {
+    setPassengerValidationError(null);
+    for (let i = 0; i < passengersList.length; i++) {
+      const pax = passengersList[i];
+      if (!pax.first_name.trim() || !pax.last_name.trim()) {
+        setPassengerValidationError(`Please enter First Name and Last Name for Passenger #${i + 1} (${pax.type.toUpperCase()}) before proceeding.`);
+        return;
+      }
+    }
+    setStep(2);
   };
 
   const toggleService = (id: string) => {
@@ -255,6 +273,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                       <label className="form-label">First Name *</label>
                       <input
                         type="text"
+                        required
                         placeholder="First Name"
                         value={pax.first_name}
                         onChange={e => handlePassengerChange(pax.id, 'first_name', e.target.value)}
@@ -265,6 +284,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                       <label className="form-label">Last Name *</label>
                       <input
                         type="text"
+                        required
                         placeholder="Last Name"
                         value={pax.last_name}
                         onChange={e => handlePassengerChange(pax.id, 'last_name', e.target.value)}
@@ -309,9 +329,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '0.85rem' }}>
                       <div>
-                        <label className="form-label">First Name</label>
+                        <label className="form-label">First Name *</label>
                         <input
                           type="text"
+                          required
                           placeholder="First Name"
                           value={pax.first_name}
                           onChange={e => handlePassengerChange(pax.id, 'first_name', e.target.value)}
@@ -319,9 +340,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
                         />
                       </div>
                       <div>
-                        <label className="form-label">Last Name</label>
+                        <label className="form-label">Last Name *</label>
                         <input
                           type="text"
+                          required
                           placeholder="Last Name"
                           value={pax.last_name}
                           onChange={e => handlePassengerChange(pax.id, 'last_name', e.target.value)}
@@ -349,6 +371,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               </div>
             )}
 
+            {/* Validation Error Alert Box */}
+            {passengerValidationError && (
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', padding: '0.85rem 1.25rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
+                <AlertCircle size={20} />
+                <span>{passengerValidationError}</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>
                 Occupying 1 Cabin ({totalPassengers} Passengers)
@@ -356,7 +386,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({ cruise, 
               <button
                 className="btn btn-primary"
                 disabled={isSoldOut || totalPassengers === 0}
-                onClick={() => setStep(2)}
+                onClick={handleNextFromStep1}
               >
                 <span>Next: Optional Services</span>
                 <ArrowRight size={18} />
